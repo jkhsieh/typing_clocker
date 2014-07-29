@@ -1,0 +1,229 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Typing Clocker</title>
+<script src="http://ajax.googleapis.com/ajax/libs/jquery/1/jquery.min.js"></script>
+</head>
+
+<body><h1>Typing Clocker</h1>
+
+<div id="tc1"></div>
+
+<div style="font-size:smaller">Deleted characters will count towards your total!</div>
+
+<script type="text/javascript">
+/**
+    TypingClocker
+    by Generic Asian Girl
+
+    Works offline, except needs initial jquery download.
+*/
+function TypingClocker (id) {
+  this.id = id;
+  var div = $("#"+this.id);
+  div.html('<div id="'+ this.id +'_user"></div>' + 
+      '<textarea id="'+ this.id +'_ta" cols="60" rows="5" placeholder="Just start typing to measure your speed!"></textarea><BR>\n' + 
+      '<DIV id="'+ this.id +'_stats" style="display:inline"></DIV> <button id="'+this.id+'_reset" >Reset</button>');
+  this.user_info = $("#"+this.id+"_user");
+  this.el = $("#"+this.id+"_ta");
+  this.stats = $("#"+this.id+"_stats");
+  this.reset = $("#"+this.id+"_reset");
+
+  // Allow backspace/editing?  If so, up the timeout?
+
+  this.restart();
+
+  var self = this;
+  this.reset.click(function () {
+      self.restart();
+  });
+}
+
+TypingClocker.prototype = {
+    user_name : null,
+    is_running : false,     // When / how is this used?
+    timer : null,
+    timestamps : [],
+    max_timeout : 1000,     // milli seconds
+    wpm : 0
+};
+
+// user functions, meant to be static
+TypingClocker.prototype.listUsers = function () {
+    // XXXX check support
+    var user_names = localStorage["typingClocker.users"];
+    if (!user_names)
+      return [];
+    return JSON.parse( "[" + user_names + "]" );
+};
+
+TypingClocker.prototype.promptForUserName = function (warning) {
+    var user_name = window.prompt((warning ? warning : "") + "What is your name? Enter a unique name to associate with your typing history.");
+    var user_names = this.listUsers();
+
+    if (!user_name) {
+      if (user_names.length == 0)
+        return this.promptForUserName();
+      return;
+    }
+
+    if (user_names.indexOf(user_name) != -1)
+      return this.promptForUserName("Sorry, that name is already taken.\n");
+
+    this.addUser( user_name );
+    this.user_name = user_name;
+    localStorage['typingClocker.curr_user'] = this.user_name;
+    user_names.push(this.user_name);
+    this.updateUserInfo(user_names, this.user_name);
+};
+
+// PREREQ: user_name should not have double quotes?
+TypingClocker.prototype.addUser = function (user_name) {
+    var user_names = localStorage["typingClocker.users"];
+    if (user_names)
+      user_names += ',';
+    else
+      user_names = '';
+    user_names += '"' + user_name + '"';
+    localStorage["typingClocker.users"] = user_names;
+};
+
+TypingClocker.prototype.updateUserInfo = function (user_names, user_name) {
+    if (!user_name)
+      user_name = localStorage['typingClocker.curr_user'];
+    var html = 'Type as ',
+        un,
+        len = user_names.length,
+        a;
+    for (var i=0; i<len; i++) {
+      un = user_names[i];
+      if (i > 0)
+        html += ' | ';
+      a = '<a href="javascript:'+this.id+'.setUser(\''+un+'\')" >'+un+'</a>';
+      if (un == user_name)
+        a = '<b>' + a + '</b>';
+      html += a;
+    }
+    this.user_info.html(html + ' | <a href="javascript:'+this.id+'.promptForUserName()">New user</a>');
+};
+
+TypingClocker.prototype.setUser = function (/*user_name*/) {
+    var user_names = this.listUsers();
+
+    if (arguments.length) {
+      this.user_name = arguments[0];
+      localStorage['typingClocker.curr_user'] = this.user_name;
+      this.updateUserInfo(user_names, this.user_name);
+      return;
+    }
+
+    // If no saved users or user clicked "New user" (see below), prompt: "" Check to make sure user name is not taken.
+    if (user_names.length == 0) {
+      this.promptForUserName();
+      return;
+    }
+
+    // Else, "Type as User 1 | User 2 | New user"
+    this.updateUserInfo(user_names);
+};
+
+    // Update wpm speed display
+    // On timeout, stop clock &...
+    // display session stats: total time, # keys, wpm (5 keys = 1 word)
+
+TypingClocker.prototype.restart = function () {
+    this.setUser();
+
+    this.el.val("");
+    this.el.removeAttr("disabled");
+    this.el.focus();  // only works with web console closed!
+    this.stats.html("0 sec, 0 wpm").css("color", "");
+    this.reset.attr("disabled", "disabled");
+
+    this.is_running = true;
+    this.timestamps = [];
+
+    var self = this;
+
+    // XXXX HT abstract into method with param?
+    this.el.keypress( function (evt) {
+        self.timestamps.push(evt.timeStamp);
+
+        if (self.timestamps.length)
+          self.reset.removeAttr("disabled");
+
+        // update wpm
+        var n = self.timestamps.length,
+            total_secs = (self.timestamps[n-1] - self.timestamps[0]) / 1000;
+        // "word" is defined as 5 chars
+        self.wpm = Math.round((n-1)/5 / total_secs * 60);
+
+        // update stats?
+    } );
+
+    this.timer = window.setInterval( function () {
+        self.stop.call(self);
+      }, 200 );
+};
+
+TypingClocker.prototype.stop = function () {
+    // May be running, but do not do anything if user has yet to start typing.
+    if (this.timestamps.length == 0)
+      return;
+
+    var n = this.timestamps.length,
+      now = Date.now(),
+      total_secs = (now - this.timestamps[0]) / 1000;
+
+    this.stats.html(total_secs.toFixed(1) + " sec, " + (this.wpm ? this.wpm : "N/A") + " wpm");  // separate time counter display?
+
+    if (now - this.timestamps[n-1] > this.max_timeout) {
+      window.clearInterval(this.timer);
+      this.is_running = false;
+      this.el.attr("disabled", "disabled");
+      this.el.off("keypress");
+
+      // recalc total_secs to exclude time since last timestamp and match wpm display?
+      total_secs = (this.timestamps[n-1] - this.timestamps[0]) / 1000;
+      this.stats.html(total_secs.toFixed(1) + " sec, " + (this.wpm ? this.wpm : "N/A") + " wpm");
+      this.stats.css("color", "red");
+
+      this.saveHistory();
+      this.testHistory();
+    }
+};
+
+TypingClocker.prototype.getHistoryJSON = function () {
+    var obj = {"text":this.el.val(), "timestamps":this.timestamps, "wpm":this.wpm};
+    return JSON.stringify(obj);
+};
+
+TypingClocker.prototype.saveHistory = function () {
+    // XXXX check support
+    // CSV for easy concat
+    var str = localStorage["typingClocker." + this.user_name];
+    if (str)
+      str += ",";
+    else
+      str = "";
+    str += this.getHistoryJSON();
+    localStorage["typingClocker." + this.user_name] = str;
+};
+
+TypingClocker.prototype.parseHistoryJSON = function (json) {
+    return JSON.parse(json);
+};
+
+TypingClocker.prototype.testHistory = function () {
+    // XXXX check support
+    var histories = JSON.parse( "[" + localStorage["typingClocker." + this.user_name] + "]"),
+        len = histories.length;
+    window.alert( len + " sessions, last one at " + histories[len-1].wpm + " wpm" );
+};
+
+var tc1 = new TypingClocker("tc1");
+</script>
+
+</body>
+</html>
