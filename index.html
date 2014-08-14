@@ -236,19 +236,74 @@ TypingClocker.prototype.saveHistory = function () {
     localStorage["typingClocker." + this.user_name] = str;
 };
 
-TypingClocker.prototype.parseHistoryJSON = function (json) {
-    return JSON.parse(json);
-};
-
-TypingClocker.prototype.testHistory = function () {
+TypingClocker.prototype.getHistory = function () {
     // XXXX check support
     if (!localStorage["typingClocker." + this.user_name]) {
       window.alert("No typing recorded for " + this.user_name);
       return;
     }
-    var histories = JSON.parse("[" + localStorage["typingClocker." + this.user_name] + "]"),
-        len = histories.length;
-    window.alert( len + " sessions, last one at " + histories[len-1].wpm + " wpm" );
+    return JSON.parse("[" + localStorage["typingClocker." + this.user_name] + "]");
+};
+
+TypingClocker.prototype.testHistory = function () {
+    var history = this.getHistory(),
+        n = history.length;
+    window.alert( n + " sessions, last one at " + history[n-1].wpm + " wpm" );
+};
+
+TypingClocker.prototype.calculateKeyTimes = function (is_cumulative) {
+    var history = this.getHistory(),
+        key_times = {},
+        n = history.length,
+        i = (is_cumulative ? 0 : n-1),
+        session,
+        n2,
+        key;
+    for (i; i<n; i++) {
+      session = history[i];
+      n2 = session.timestamps.length;
+      for (j=1; j<n2; j++) {
+        key = session.text.charAt(j);
+        if (!key_times[key])
+          key_times[key] = [];
+        key_times[key].push( session.timestamps[j] - session.timestamps[j-1] );
+      }
+    }
+    return key_times;
+};
+
+TypingClocker.prototype.calculateKeyTimeAverages = function (is_cumulative) {
+    var key_times = this.calculateKeyTimes(is_cumulative),
+        averages = {};
+    for (var k in key_times) {
+      averages[k] = Math.average( key_times[k] );
+    }
+    return averages;
+};
+
+TypingClocker.prototype.calculateKeySpeeds = function (is_cumulative) {
+    var key_times = this.calculateKeyTimes(is_cumulative),
+        wpms = {},
+        k_times;
+    for (var k in key_times) {
+      k_times = key_times[k];
+      wpms[k] = Math.round( this.calculateWPM(k_times.length, Math.sum(k_times)) );
+    }
+    return wpms;
+};
+
+Math.sum = function (arr) {
+    var sum = 0;
+    for (var i in arr)
+      sum += arr[i];
+    return sum;
+};
+
+Math.average = function (arr) {
+    if (arr.length == 0)
+      return NaN;
+    var sum = Math.sum(arr);
+    return sum / arr.length;
 };
 
 var tc1 = new TypingClocker("tc1");
