@@ -6,11 +6,11 @@
 <script src="http://ajax.googleapis.com/ajax/libs/jquery/1/jquery.min.js"></script>
 </head>
 
-<body><h1>Typing Clocker</h1>
+<body><h1 style="font-family:monospace; color:#006; background-color:#fc9; text-align:center; padding:5px;">Typing Clocker</h1>
 
 <div id="tc1"></div>
 
-<div style="font-size:smaller">Deleted characters will count towards your total!</div>
+<div style="font-size:smaller"><span style="color:white; background-color:red; padding:3px; font-weight:bold;">!</span> Deleted characters will count towards your total!</div>
 
 <script type="text/javascript">
 /**
@@ -23,7 +23,7 @@ function TypingClocker (id) {
   this.id = id;
   var div = $("#"+this.id);
   div.html('<div id="'+ this.id +'_user"></div>' + 
-      '<textarea id="'+ this.id +'_ta" cols="60" rows="5" placeholder="Just start typing to measure your speed!"></textarea><BR>\n' + 
+      '<textarea id="'+ this.id +'_ta" rows="10" placeholder="Just start typing to measure your speed!" style="width:100%"></textarea><BR>\n' + 
       '<DIV id="'+ this.id +'_stats" style="display:inline"></DIV> <button id="'+this.id+'_reset" >Reset</button>');
   this.user_info = $("#"+this.id+"_user");
   this.el = $("#"+this.id+"_ta");
@@ -89,9 +89,10 @@ TypingClocker.prototype.addUser = function (user_name) {
     localStorage["typingClocker.users"] = user_names;
 };
 
-TypingClocker.prototype.updateUserInfo = function (user_names, user_name) {
-    if (!user_name)
-      user_name = localStorage['typingClocker.curr_user'];
+TypingClocker.prototype.updateUserInfo = function (user_names, curr_username) {
+    if (!curr_username)
+      curr_username = localStorage['typingClocker.curr_user'];
+
     var html = 'Type as ',
         un,
         len = user_names.length,
@@ -101,8 +102,9 @@ TypingClocker.prototype.updateUserInfo = function (user_names, user_name) {
       if (i > 0)
         html += ' | ';
       a = '<a href="javascript:'+this.id+'.setUser(\''+un+'\')" >'+un+'</a>';
-      if (un == user_name)
+      if (un == curr_username)
         a = '<b>' + a + '</b>';
+
       html += a;
     }
     this.user_info.html(html + ' | <a href="javascript:'+this.id+'.promptForUserName()">New user</a>');
@@ -217,7 +219,11 @@ TypingClocker.prototype.parseHistoryJSON = function (json) {
 
 TypingClocker.prototype.testHistory = function () {
     // XXXX check support
-    var histories = JSON.parse( "[" + localStorage["typingClocker." + this.user_name] + "]"),
+    if (!localStorage["typingClocker." + this.user_name]) {
+      window.alert("No typing recorded for " + this.user_name);
+      return;
+    }
+    var histories = JSON.parse("[" + localStorage["typingClocker." + this.user_name] + "]"),
         len = histories.length;
     window.alert( len + " sessions, last one at " + histories[len-1].wpm + " wpm" );
 };
