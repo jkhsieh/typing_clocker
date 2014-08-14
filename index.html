@@ -156,12 +156,11 @@ TypingClocker.prototype.restart = function () {
           self.reset.removeAttr("disabled");
 
         // update wpm
-        var n = self.timestamps.length,
-            total_secs = (self.timestamps[n-1] - self.timestamps[0]) / 1000;
-        // "word" is defined as 5 chars
-        self.wpm = Math.round((n-1)/5 / total_secs * 60);
+        if (self.timestamps.length == 1)
+          return;
+        self.wpm = Math.round(self.calculateWPM());
 
-        // update stats?
+        self.updateStats();
     } );
 
     this.timer = window.setInterval( function () {
@@ -169,26 +168,46 @@ TypingClocker.prototype.restart = function () {
       }, 200 );
 };
 
+TypingClocker.prototype.calculateWPM = function (char_count, msec) {
+    if (!char_count) {
+      char_count = this.timestamps.length;
+      msec = this.timestamps[char_count-1] - this.timestamps[0];
+    }
+    // "word" is defined as 5 chars
+    return (char_count/5 / (msec/1000/60));
+};
+
+TypingClocker.prototype.updateStats = function (end_stamp) {
+    if (!end_stamp)
+      end_stamp = Date.now();
+    var n = this.timestamps.length,
+        total_secs = (end_stamp - this.timestamps[0]) / 1000;
+
+    // separate time elapsed?
+    this.stats.html(total_secs.toFixed(1) + " sec, " + (this.wpm ? this.wpm : "N/A") + " wpm");
+};
+
+TypingClocker.prototype.isTimedOut = function () {
+    var n = this.timestamps.length;
+    return (Date.now() - this.timestamps[n-1] > this.max_timeout);
+};
+
 TypingClocker.prototype.stop = function () {
     // May be running, but do not do anything if user has yet to start typing.
     if (this.timestamps.length == 0)
       return;
 
-    var n = this.timestamps.length,
-      now = Date.now(),
-      total_secs = (now - this.timestamps[0]) / 1000;
+    this.updateStats();
 
-    this.stats.html(total_secs.toFixed(1) + " sec, " + (this.wpm ? this.wpm : "N/A") + " wpm");  // separate time counter display?
-
-    if (now - this.timestamps[n-1] > this.max_timeout) {
+    if (this.isTimedOut()) {
       window.clearInterval(this.timer);
       this.is_running = false;
       this.el.attr("disabled", "disabled");
       this.el.off("keypress");
 
       // recalc total_secs to exclude time since last timestamp and match wpm display?
-      total_secs = (this.timestamps[n-1] - this.timestamps[0]) / 1000;
-      this.stats.html(total_secs.toFixed(1) + " sec, " + (this.wpm ? this.wpm : "N/A") + " wpm");
+      var n = this.timestamps.length;
+      this.updateStats(this.timestamps[n-1]);
       this.stats.css("color", "red");
 
       if (!this.wpm) {
