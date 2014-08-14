@@ -191,8 +191,12 @@ TypingClocker.prototype.stop = function () {
       this.stats.html(total_secs.toFixed(1) + " sec, " + (this.wpm ? this.wpm : "N/A") + " wpm");
       this.stats.css("color", "red");
 
+      if (!this.wpm) {
+        window.alert("Wow, did you have trouble finding the keyboard? Try again.");
+        return;
+      }
       this.saveHistory();
-      this.testHistory();
+      //this.testHistory();
     }
 };
 
